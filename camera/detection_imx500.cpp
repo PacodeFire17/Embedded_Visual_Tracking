@@ -210,6 +210,7 @@ int main()
 {
     // Register the signal handler for interrupt (SIGINT) and termination (SIGTERM) signals
     std::signal(SIGINT, imx500::signalHandler);
+    std::signal(SIGTERM, imx500::signalHandler);
 
     // Load the network on the sensor (before libcamera starts, like picamera2)
     std::unique_ptr<imx500::NetworkLoader> net;
