@@ -102,7 +102,7 @@ namespace imx500
         for (size_t i = 0; i < numDet; i++)
         {
             float score = scores[i];
-            if (score < 0.5f)
+            if (score < SCORE_THRESHOLD)
             {
                 continue; // Skip detections with low confidence
             }
@@ -217,7 +217,7 @@ int main()
     try
     {
         net = std::make_unique<imx500::NetworkLoader>();
-        net->loadNetwork("/home/raspberry/imx500-models/imx500_network_yolo11n_pp.rpk");
+        net->loadNetwork(imx500::MODEL_PATH);
         net->setInferenceRoi(0, 0, static_cast<unsigned>(imx500::SENSOR_W), static_cast<unsigned>(imx500::SENSOR_H));
         std::cerr << "network loaded via " << net->devicePath() << "\n";
     }

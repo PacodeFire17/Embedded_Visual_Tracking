@@ -33,6 +33,14 @@ namespace imx500
     constexpr float Input_W = 640.0f;
     ///@}
 
+    /** @name Detection Parameters */
+    ///@{
+    /// Minimum confidence score for a detection to be kept.
+    constexpr float SCORE_THRESHOLD = 0.5f;
+    /// Path of the network file (.rpk) loaded on the sensor.
+    constexpr const char *MODEL_PATH = "/home/raspberry/imx500-models/imx500_network_yolo11n_pp.rpk";
+    ///@}
+
     /** @name IMX500 Sensor Specifications */
     ///@{
     /// Native sensor width of the IMX500.
