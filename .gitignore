@@ -1,0 +1,14 @@
+# local vscode settings
+.vscode/
+
+# local compilation settings
+compile_flags.txt
+
+#compiled files
+*.o
+*.out
+*.so
+*.a
+build/
+rilevamento_imx500
+detection_imx500
