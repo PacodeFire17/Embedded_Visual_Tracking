@@ -4,6 +4,7 @@
  */
 
 #include "detection_imx500.hpp"
+#include "imx500_network.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -22,6 +23,8 @@ namespace
 {
     /// Flag indicating whether image acquisition should continue.
     std::atomic<bool> running{true};
+    /// Becomes true at the first frame carrying the CNN output: the network is running on the sensor.
+    std::atomic<bool> networkReady{false};
     /// Shared smart pointer to the Camera object representing the physical IMX500 sensor.
     std::shared_ptr<Camera> camera;
 } // namespace
@@ -117,10 +120,10 @@ namespace imx500
             // 5.2 Geometric remapping: from network space (1:1) to sensor space (4:3)
             // By multiplying the normalized coordinate by 3040 and adding the 508-pixel offset along the X axis,
             // we obtain sx0, sy0, sx1, sy1 (float): absolute bounding box coordinates on the physical sensor.
-            float sx0 = NET_CROP_X + x0 * NET_CROP_SIZE;
-            float sy0 = NET_CROP_Y + y0 * NET_CROP_SIZE;
-            float sx1 = NET_CROP_X + x1 * NET_CROP_SIZE;
-            float sy1 = NET_CROP_Y + y1 * NET_CROP_SIZE;
+            float sx0 = x0 * SENSOR_W;   // the network sees the whole 4056×3040 sensor, squashed to 640×640
+            float sy0 = y0 * SENSOR_H;
+            float sx1 = x1 * SENSOR_W;
+            float sy1 = y1 * SENSOR_H;
 
             // 5.3 From physical sensor to video frame (640 × 480)
             // Calculates the relative position (from 0.0 to 1.0)
@@ -171,6 +174,12 @@ namespace imx500
             return;
         }
 
+        // The first output tensor means the network upload to the sensor is complete
+        if (!networkReady && request->metadata().get(controls::rpi::CnnOutputTensor))
+        {
+            networkReady = true;
+        }
+
         // Process metadata and print detections
         for (const auto &det : parseDetections(request->metadata()))
         {
@@ -196,6 +205,22 @@ int main()
 {
     // Register the signal handler for interrupt (SIGINT) and termination (SIGTERM) signals
     std::signal(SIGINT, imx500::signalHandler);
+
+    // Load the network on the sensor (before libcamera starts, like picamera2)
+    std::unique_ptr<imx500::NetworkLoader> net;
+    try
+    {
+        net = std::make_unique<imx500::NetworkLoader>();
+        net->loadNetwork("/home/raspberry/imx500-models/imx500_network_yolo11n_pp.rpk");
+        net->setInferenceRoi(0, 0, static_cast<unsigned>(imx500::SENSOR_W), static_cast<unsigned>(imx500::SENSOR_H));
+        std::cerr << "network loaded via " << net->devicePath() << "\n";
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << "\n";
+        return 1;
+    }
+
 
     // Central libcamera manager. Also starts an internal background thread to handle hardware events.
     CameraManager cm;
@@ -280,8 +305,15 @@ int main()
     }
 
     // Main thread has finished setup; wait for Ctrl+C to terminate acquisition
+    // The network is uploaded to the sensor when the stream starts: announce it at the first CNN output
+    bool readyShown = false;
     while (running)
     {
+        if (networkReady && !readyShown)
+        {
+            std::cerr << "Rete caricata\n";
+            readyShown = true;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
