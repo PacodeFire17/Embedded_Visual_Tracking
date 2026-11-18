@@ -110,8 +110,8 @@ namespace imx500
             // 5: Dual coordinate transformation (Network -> Sensor -> Video)
 
             // 5.1 Transforming pixel coordinates to normalized coordinates in the range [0, 1]
-            // WARNING: The coordinate order depends on the network! Needs verification
-            // todo()
+            // The network outputs each box as x0, y0, x1, y1 in pixels (0..640), so we divide by Input_W.
+            // Order and range verified on the Pi with trial.py on 17/11/2026.
             float x0 = boxes[i * 4 + 0] / Input_W;
             float y0 = boxes[i * 4 + 1] / Input_W;
             float x1 = boxes[i * 4 + 2] / Input_W;
