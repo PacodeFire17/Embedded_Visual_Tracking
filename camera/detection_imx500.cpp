@@ -118,9 +118,10 @@ namespace imx500
             float y1 = boxes[i * 4 + 3] / Input_W;
 
             // 5.2 Geometric remapping: from network space (1:1) to sensor space (4:3)
-            // By multiplying the normalized coordinate by 3040 and adding the 508-pixel offset along the X axis,
-            // we obtain sx0, sy0, sx1, sy1 (float): absolute bounding box coordinates on the physical sensor.
-            float sx0 = x0 * SENSOR_W;   // the network sees the whole 4056×3040 sensor, squashed to 640×640
+            // The network input region is the whole sensor (set in main with setInferenceRoi),
+            // squashed to 640 × 640: x is scaled by 4056 (SENSOR_W) and y by 3040 (SENSOR_H), with no offset.
+            // We obtain sx0, sy0, sx1, sy1 (float): absolute bounding box coordinates on the physical sensor.
+            float sx0 = x0 * SENSOR_W;
             float sy0 = y0 * SENSOR_H;
             float sx1 = x1 * SENSOR_W;
             float sy1 = y1 * SENSOR_H;
