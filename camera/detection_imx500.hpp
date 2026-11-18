@@ -49,16 +49,6 @@ namespace imx500
     constexpr float SENSOR_H = 3040.0f;
     ///@}
 
-    /** @name Network Cropping Parameters */
-    ///@{
-    /// Horizontal offset to crop the sensor image to a 1:1 aspect ratio.
-    constexpr float NET_CROP_X = (SENSOR_W - SENSOR_H) / 2.0f;
-    /// Vertical offset to crop the sensor image to a 1:1 aspect ratio.
-    constexpr float NET_CROP_Y = 0.0f;
-    /// Size of the square crop (equal to sensor height) to achieve a 1:1 aspect ratio.
-    constexpr float NET_CROP_SIZE = SENSOR_H;
-    ///@}
-
     /**
      * @brief Output tensor metadata structure for libcamera.
      * @see https://www.raspberrypi.com/documentation/accessories/ai-camera.html#reference
