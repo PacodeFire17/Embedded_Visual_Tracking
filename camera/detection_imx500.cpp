@@ -140,6 +140,11 @@ namespace imx500
             float w = ix1 - ix0;
             // Bounding box height
             float h = iy1 - iy0;
+            // Skip boxes left empty by the clamp (completely outside the video frame)
+            if (w <= 0.0f || h <= 0.0f)
+            {
+                continue;
+            }
             // X coordinate of the bounding box center
             float cx = ix0 + w / 2.0f;
             // Y coordinate of the bounding box center
