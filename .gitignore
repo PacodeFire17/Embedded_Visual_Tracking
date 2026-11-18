@@ -11,4 +11,5 @@ compile_flags.txt
 *.a
 build/
 rilevamento_imx500
-detection_imx500
+
+third_party/
