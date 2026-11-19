@@ -56,7 +56,7 @@ namespace imx500
         auto tensorOpt = metadata.get(controls::rpi::CnnOutputTensor);
         auto tensorInfoOpt = metadata.get(controls::rpi::CnnOutputTensorInfo);
 
-        if (!tensorOpt || !tensorInfoOpt || tensorInfoOpt->size() < sizeof(CnnOutputTensorInfo))
+        if (!tensorOpt || !tensorInfoOpt || tensorInfoOpt->size() != sizeof(CnnOutputTensorInfo))
         {
             return results;
         }
@@ -77,6 +77,12 @@ namespace imx500
         size_t scoresLen = info->info[1].tensorDataNum;
         // Number of detections
         size_t numDet = boxesLen / 4;
+        
+        // The buffer must hold boxes, scores and classes
+        if (tensorOpt->size() < boxesLen + scoresLen + numDet)
+        {
+            return results;
+        }
 
         // Pointer to the boxes array
         const float *boxes = data;
@@ -112,10 +118,12 @@ namespace imx500
             // 5.1 Transforming pixel coordinates to normalized coordinates in the range [0, 1]
             // The network outputs each box as x0, y0, x1, y1 in pixels (0..640), so we divide by Input_W.
             // Order and range verified on the Pi with trial.py on 17/11/2026.
-            float x0 = boxes[i * 4 + 0] / Input_W;
-            float y0 = boxes[i * 4 + 1] / Input_W;
-            float x1 = boxes[i * 4 + 2] / Input_W;
-            float y1 = boxes[i * 4 + 3] / Input_W;
+            // The tensor is stored column by column (Fortran order, like picamera2's reshape(order='F')):
+            // first all x0, then all y0, then all x1, then all y1.
+            float x0 = boxes[0 * numDet + i] / Input_W;
+            float y0 = boxes[1 * numDet + i] / Input_W;
+            float x1 = boxes[2 * numDet + i] / Input_W;
+            float y1 = boxes[3 * numDet + i] / Input_W;
 
             // 5.2 Geometric remapping: from network space (1:1) to sensor space (4:3)
             // The network input region is the whole sensor (set in main with setInferenceRoi),

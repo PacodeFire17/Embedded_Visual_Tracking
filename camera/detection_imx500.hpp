@@ -13,10 +13,10 @@ namespace imx500
 {
     /** @name Metadata Layout Constants */
     ///@{
-    /// Maximum number of output tensors supported by CnnOutputTensorInfo.
-    constexpr int MAX_TENSOR = 4;
-    /// Maximum number of dimensions supported per tensor.
-    constexpr int MAX_NUM_DIMENSION = 4;
+    /// Maximum number of output tensors in CnnOutputTensorInfo (16, as in libcamera and picamera2).
+    constexpr int MAX_TENSOR = 16;
+    /// Maximum number of dimensions per tensor (16, as in libcamera and picamera2).
+    constexpr int MAX_NUM_DIMENSION = 16;
     ///@}
 
     /** @name Camera Stream Parameters */
@@ -69,8 +69,12 @@ namespace imx500
         char networkName[64];              ///< Name of the neural network model.
         uint32_t numTensors;               ///< Number of output tensors.
         OutputTensorInfo info[MAX_TENSOR]; ///< Metadata for each output tensor.
+        uint8_t frameCount;                ///< Frame counter (last field of libcamera's exported struct).
     };
-
+    // Same layout as picamera2's CnnOutputTensorInfoExported: 64 + 4 + 16 * 40 + 1 bytes, padded to 712
+    static_assert(sizeof(CnnOutputTensorInfo) == 712, "CnnOutputTensorInfo does not match libcamera's layout");
+    
+    
     /**
      * @brief High-level representation of a single detected object.
      */
