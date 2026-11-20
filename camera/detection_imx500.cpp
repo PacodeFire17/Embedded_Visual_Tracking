@@ -4,6 +4,7 @@
  */
 
 #include "detection_imx500.hpp"
+#include "frame_timer.hpp"
 #include "imx500_network.hpp"
 
 #include <algorithm>
@@ -21,6 +22,8 @@ using namespace libcamera;
 
 namespace
 {
+    ///
+    constexpr bool ENABLE_TIMER = true; ///< Flag to enable frame timing logs for performance monitoring.
     /// Flag indicating whether image acquisition should continue.
     std::atomic<bool> running{true};
     /// Becomes true at the first frame carrying the CNN output: the network is running on the sensor.
@@ -77,7 +80,7 @@ namespace imx500
         size_t scoresLen = info->info[1].tensorDataNum;
         // Number of detections
         size_t numDet = boxesLen / 4;
-        
+
         // The buffer must hold boxes, scores and classes
         if (tensorOpt->size() < boxesLen + scoresLen + numDet)
         {
@@ -194,6 +197,12 @@ namespace imx500
             networkReady = true;
         }
 
+        // Optional frame timing logs for performance monitoring
+        if constexpr (ENABLE_TIMER)
+        {
+            logFrameTime(); // or logFrameTime(30) to print every 30 frames
+        }
+
         // Process metadata and print detections
         for (const auto &det : parseDetections(request->metadata()))
         {
@@ -235,7 +244,6 @@ int main()
         std::cerr << e.what() << "\n";
         return 1;
     }
-
 
     // Central libcamera manager. Also starts an internal background thread to handle hardware events.
     CameraManager cm;
