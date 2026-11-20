@@ -200,11 +200,17 @@ namespace imx500
         // Optional frame timing logs for performance monitoring
         if constexpr (ENABLE_TIMER)
         {
-            logFrameTime(); // or logFrameTime(30) to print every 30 frames
+            startFrameTimer(); // or logFrameTime(30) to print every 30 frames
         }
 
+        const auto detections = parseDetections(request->metadata());
+
+        if constexpr (ENABLE_TIMER)
+        {
+            endFrameTimer(8);
+        }
         // Process metadata and print detections
-        for (const auto &det : parseDetections(request->metadata()))
+        for (const auto &det : detections)
         {
             std::printf("classe %2d  score %.2f  "
                         "box x=%.0f y=%.0f w=%.0f h=%.0f  "
