@@ -17,6 +17,7 @@ pkg_check_modules(LIBCAMERA REQUIRED IMPORTED_TARGET libcamera)
 add_executable(rilevamento_imx500
     camera/detection_imx500.cpp
     camera/imx500_network.cpp
+    camera/frame_logger.cpp
 )
 
 target_link_libraries(rilevamento_imx500 PRIVATE PkgConfig::LIBCAMERA)

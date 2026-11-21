@@ -12,4 +12,9 @@ compile_flags.txt
 build/
 rilevamento_imx500
 
+
+# run logs
+logs/
+
+
 third_party/
