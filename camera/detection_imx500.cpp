@@ -206,7 +206,7 @@ namespace imx500
         // Capture time of this frame (CLOCK_BOOTTIME, ns) and whether it carries a network result
         const std::int64_t tSensor = metadata.get(controls::SensorTimestamp).value_or(0);
         const bool hasTensor = metadata.get(controls::rpi::CnnOutputTensor).has_value();
-        /// Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
+        // Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
         std::int32_t dnnUs = -1, dspUs = -1;
         if (auto kpi = metadata.get(controls::rpi::CnnKpiInfo))
         {
