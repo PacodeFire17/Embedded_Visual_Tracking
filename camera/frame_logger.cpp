@@ -42,7 +42,7 @@ namespace imx500
         }
     }
 
-    void FrameLogger::logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs,
+    void FrameLogger::logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs, std::int64_t parseNs,
                       bool hasTensor, std::int32_t dnnUs, std::int32_t dspUs,
                       const std::vector<Detection> &detections)
     {
