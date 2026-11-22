@@ -37,13 +37,6 @@ namespace
     std::unique_ptr<imx500::FrameLogger> logger;
     /// Progressive number of the completed frames.
     std::uint64_t frameCount = 0;
-    /// Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
-    std::int32_t dnnUs = -1, dspUs = -1;
-    if (auto kpi = metadata.get(controls::rpi::CnnKpiInfo))
-    {
-        dnnUs = (*kpi)[0];
-        dspUs = (*kpi)[1];
-    }
     /// Also print the detections on screen (the CSV log has them anyway).
     constexpr bool PRINT_DETECTIONS = true;
 
@@ -213,12 +206,21 @@ namespace imx500
         // Capture time of this frame (CLOCK_BOOTTIME, ns) and whether it carries a network result
         const std::int64_t tSensor = metadata.get(controls::SensorTimestamp).value_or(0);
         const bool hasTensor = metadata.get(controls::rpi::CnnOutputTensor).has_value();
-
+        // Time spent in parseDetections on the Pi, ns
+        std::int64_t parseNs = 0;
+        /// Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
+        std::int32_t dnnUs = -1, dspUs = -1;
+        if (auto kpi = metadata.get(controls::rpi::CnnKpiInfo))
+        {
+            dnnUs = (*kpi)[0];
+            dspUs = (*kpi)[1];
+        }
         // The first output tensor means the network upload to the sensor is complete
         if (!networkReady && hasTensor)
         {
             networkReady = true;
         }
+
 
         // Optional timing of the parsing, for performance monitoring
         if constexpr (ENABLE_TIMER)
@@ -226,18 +228,20 @@ namespace imx500
             startFrameTimer();
         }
 
+        const std::int64_t tParseStart = nowBoottimeNs();
         const auto detections = parseDetections(metadata);
+        // End of processing, on the same clock as tSensor: tProc - tSensor is the latency
+        const std::int64_t tProc = nowBoottimeNs();
 
         if constexpr (ENABLE_TIMER)
         {
             endFrameTimer(8);
         }
 
-        // End of processing, on the same clock as tSensor: tProc - tSensor is the latency
-        const std::int64_t tProc = nowBoottimeNs();
+
         if (logger)
         {
-            logger->logFrame(frameCount++, tSensor, tProc, hasTensor, dnnUs, dspUs, detections);
+            logger->logFrame(frameCount++, tSensor, tProc, tProc - tParseStart, hasTensor, dnnUs, dspUs, detections);
         }
 
         // Optional: also print the detections on screen (the CSV log has them anyway)

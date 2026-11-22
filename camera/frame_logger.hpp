@@ -38,12 +38,13 @@ namespace imx500
          * @param frame      Progressive frame number.
          * @param tSensorNs  Capture time from the frame metadata (SensorTimestamp), CLOCK_BOOTTIME.
          * @param tProcNs    Time when processing of the frame ended, CLOCK_BOOTTIME.
+         * @param parseNs    Time spent in parseDetections on the Pi, ns.
          * @param hasTensor  True if the frame carried the CNN output.
          * @param dnnUs      Network run time on the sensor (CnnKpiInfo[0], µs), -1 if not available.
          * @param dspUs      DSP run time on the sensor (CnnKpiInfo[1], µs), -1 if not available.
          * @param detections Detections of the frame (may be empty).
          */
-                void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs,
+                void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs, std::int64_t parseNs,
                       bool hasTensor, std::int32_t dnnUs, std::int32_t dspUs,
                       const std::vector<Detection> &detections);
 

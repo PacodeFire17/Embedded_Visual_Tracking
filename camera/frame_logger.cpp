@@ -30,7 +30,7 @@ namespace imx500
         {
             throw std::runtime_error("cannot create " + path_);
         }
-        std::fprintf(file_, "frame,t_sensor_ns,t_proc_ns,has_tensor, dnn_us,dsp_us, cls,score,x,y,w,h,err_x,err_y\n");
+        std::fprintf(file_, "frame,t_sensor_ns,t_proc_ns,parse_ns,has_tensor,dnn_us,dsp_us,cls,score,x,y,w,h,err_x,err_y\n");
     }
 
     FrameLogger::~FrameLogger()
@@ -49,15 +49,15 @@ namespace imx500
         if (detections.empty())
         {
             // Frame without detections: keep the timing, leave the detection fields empty
-            std::fprintf(file_, "%" PRIu64 ",%" PRId64 ",%" PRId64 ",%d,%d,%d,,,,,,,,\n",
-                         frame, tSensorNs, tProcNs, hasTensor ? 1 : 0, dnnUs, dspUs);
+            std::fprintf(file_, "%" PRIu64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%d,%d,%d,,,,,,,,\n",
+                         frame, tSensorNs, tProcNs, parseNs, hasTensor ? 1 : 0, dnnUs, dspUs);
             return;
         }
         for (const Detection &d : detections)
         {
-            std::fprintf(file_, "%" PRIu64 ",%" PRId64 ",%" PRId64 ",%d,%d,%d,%d,%.3f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n",
-                         frame, tSensorNs, tProcNs, hasTensor ? 1 : 0, dnnUs, dspUs,
-                         d.cls, d.score, d.x, d.y, d.w, d.h, d.errX, d.errY);
+            std::fprintf(file_, "%" PRIu64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%d,%d,%d,%d,%.3f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n",
+                     frame, tSensorNs, tProcNs, parseNs, hasTensor ? 1 : 0, dnnUs, dspUs,
+                     d.cls, d.score, d.x, d.y, d.w, d.h, d.errX, d.errY);
         }
     }
 } // namespace imx500
