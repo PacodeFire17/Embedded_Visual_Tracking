@@ -37,6 +37,13 @@ namespace
     std::unique_ptr<imx500::FrameLogger> logger;
     /// Progressive number of the completed frames.
     std::uint64_t frameCount = 0;
+    /// Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
+    std::int32_t dnnUs = -1, dspUs = -1;
+    if (auto kpi = metadata.get(controls::rpi::CnnKpiInfo))
+    {
+        dnnUs = (*kpi)[0];
+        dspUs = (*kpi)[1];
+    }
     /// Also print the detections on screen (the CSV log has them anyway).
     constexpr bool PRINT_DETECTIONS = true;
 
@@ -230,7 +237,7 @@ namespace imx500
         const std::int64_t tProc = nowBoottimeNs();
         if (logger)
         {
-            logger->logFrame(frameCount++, tSensor, tProc, hasTensor, detections);
+            logger->logFrame(frameCount++, tSensor, tProc, hasTensor, dnnUs, dspUs, detections);
         }
 
         // Optional: also print the detections on screen (the CSV log has them anyway)

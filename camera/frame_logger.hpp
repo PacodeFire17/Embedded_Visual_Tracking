@@ -39,10 +39,13 @@ namespace imx500
          * @param tSensorNs  Capture time from the frame metadata (SensorTimestamp), CLOCK_BOOTTIME.
          * @param tProcNs    Time when processing of the frame ended, CLOCK_BOOTTIME.
          * @param hasTensor  True if the frame carried the CNN output.
+         * @param dnnUs      Network run time on the sensor (CnnKpiInfo[0], µs), -1 if not available.
+         * @param dspUs      DSP run time on the sensor (CnnKpiInfo[1], µs), -1 if not available.
          * @param detections Detections of the frame (may be empty).
          */
-        void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs,
-                      bool hasTensor, const std::vector<Detection> &detections);
+                void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs,
+                      bool hasTensor, std::int32_t dnnUs, std::int32_t dspUs,
+                      const std::vector<Detection> &detections);
 
         /// Path of the CSV file being written.
         const std::string &path() const { return path_; }
