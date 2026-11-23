@@ -7,6 +7,8 @@
 #include "frame_timer.hpp"
 #include "imx500_network.hpp"
 #include "frame_logger.hpp"
+#include "model_spec.hpp"
+
 
 #include <algorithm>
 #include <atomic>
@@ -40,6 +42,9 @@ namespace
     /// Also print the detections on screen (the CSV log has them anyway).
     constexpr bool PRINT_DETECTIONS = true;
 
+    /// Detection model chosen on the command line.
+    const imx500::ModelSpec *model = &imx500::MODELS[0];
+
 } // namespace
 
 namespace imx500
@@ -59,9 +64,10 @@ namespace imx500
     /**
      * @brief Parses CNN output metadata from libcamera and extracts detections.
      * @param metadata ControlList containing camera frame metadata.
+     * @param model The model specification to use for parsing.
      * @return Vector of parsed Detection objects.
      */
-    std::vector<Detection> parseDetections(const ControlList &metadata)
+    std::vector<Detection> parseDetections(const ControlList &metadata, const ModelSpec &model)
     {
         // 1. Extraction and verification of binary metadata
         std::vector<Detection> results;
@@ -126,21 +132,55 @@ namespace imx500
                 continue; // Skip detections with low confidence
             }
 
+            int cls = static_cast<int>(classes[i]);
+            if (model.labels90)
+            {
+                cls = coco90To80(cls); // same class numbers for every model
+                if (cls < 0)
+                {
+                    continue; // unused COCO id
+                }
+            }
+
             // 5: Dual coordinate transformation (Network -> Sensor -> Video)
 
-            // 5.1 Transforming pixel coordinates to normalized coordinates in the range [0, 1]
-            // The network outputs each box as x0, y0, x1, y1 in pixels (0..640), so we divide by Input_W.
-            // Order and range verified on the Pi with trial.py on 17/11/2026.
-            // The tensor is stored column by column (Fortran order, like picamera2's reshape(order='F')):
-            // first all x0, then all y0, then all x1, then all y1.
-            float x0 = boxes[0 * numDet + i] / Input_W;
-            float y0 = boxes[1 * numDet + i] / Input_W;
-            float x1 = boxes[2 * numDet + i] / Input_W;
-            float y1 = boxes[3 * numDet + i] / Input_W;
+            // 5.1 The four box values of detection i (the tensor is stored column by column,
+            //     like picamera2's reshape(order='F'): first all the 1st values, then all the 2nd, ...)
+            const float c0 = boxes[0 * numDet + i];
+            const float c1 = boxes[1 * numDet + i];
+            const float c2 = boxes[2 * numDet + i];
+            const float c3 = boxes[3 * numDet + i];
+
+            // Normalized [0, 1] coordinates, whatever the model's layout
+            float x0, y0, x1, y1;
+            if (model.boxFormat == BoxFormat::PixelsXY)
+            {
+                // YOLO: x0, y0, x1, y1 in pixels of the network input
+                x0 = c0 / model.inputSize;
+                y0 = c1 / model.inputSize;
+                x1 = c2 / model.inputSize;
+                y1 = c3 / model.inputSize;
+            }
+            else if (model.boxFormat == BoxFormat::PixelsYX)
+            {
+                // EfficientDet-Lite0: y0, x0, y1, x1 in pixels of the network input
+                y0 = c0 / model.inputSize;
+                x0 = c1 / model.inputSize;
+                y1 = c2 / model.inputSize;
+                x1 = c3 / model.inputSize;
+            }
+            else
+            {
+                // SSD, NanoDet: y0, x0, y1, x1 already normalized
+                y0 = c0;
+                x0 = c1;
+                y1 = c2;
+                x1 = c3;
+            }
 
             // 5.2 Geometric remapping: from network space (1:1) to sensor space (4:3)
             // The network input region is the whole sensor (set in main with setInferenceRoi),
-            // squashed to 640 × 640: x is scaled by 4056 (SENSOR_W) and y by 3040 (SENSOR_H), with no offset.
+            // squashed to the square network input: x is scaled by 4056 (SENSOR_W) and y by 3040 (SENSOR_H), with no offset.
             // We obtain sx0, sy0, sx1, sy1 (float): absolute bounding box coordinates on the physical sensor.
             float sx0 = x0 * SENSOR_W;
             float sy0 = y0 * SENSOR_H;
@@ -173,7 +213,7 @@ namespace imx500
             float cy = iy0 + h / 2.0f;
 
             results.push_back(Detection{
-                static_cast<int>(classes[i]),
+                cls,
                 score,
                 ix0, iy0, w, h,
                 cx, cy,
@@ -227,7 +267,7 @@ namespace imx500
         }
 
         const std::int64_t tParseStart = nowBoottimeNs();
-        const auto detections = parseDetections(metadata);
+        const auto detections = parseDetections(metadata, *model);
         // End of processing, on the same clock as tSensor: tProc - tSensor is the latency
         const std::int64_t tProc = nowBoottimeNs();
 
@@ -266,8 +306,30 @@ namespace imx500
 
 } // namespace imx500
 
-int main()
+int main(int argc, char **argv)
 {
+    // Model choice: ./rilevamento_imx500 [--model yolo11n|yolov8n|efficientdet|ssd|nanodet]
+    for (int a = 1; a < argc; ++a)
+    {
+        const std::string_view arg = argv[a];
+        if (arg == "--model" && a + 1 < argc)
+        {
+            model = imx500::findModel(argv[++a]);
+            if (!model)
+            {
+                std::cerr << "unknown model " << argv[a] << " (yolo11n, yolov8n, efficientdet, ssd, nanodet)\n";
+                return 1;
+            }
+        }
+        else
+        {
+            std::cerr << "usage: " << argv[0] << " [--model yolo11n|yolov8n|efficientdet|ssd|nanodet]\n";
+            return 1;
+        }
+    }
+    const std::string modelPath = std::string(imx500::MODEL_DIR) + model->file;
+    std::cerr << "model: " << model->name << " (" << modelPath << ")\n";
+
     // Register the signal handler for interrupt (SIGINT) and termination (SIGTERM) signals
     std::signal(SIGINT, imx500::signalHandler);
     std::signal(SIGTERM, imx500::signalHandler);
@@ -277,7 +339,7 @@ int main()
     try
     {
         net = std::make_unique<imx500::NetworkLoader>();
-        net->loadNetwork(imx500::MODEL_PATH);
+        net->loadNetwork(modelPath);
         net->setInferenceRoi(0, 0, static_cast<unsigned>(imx500::SENSOR_W), static_cast<unsigned>(imx500::SENSOR_H));
         std::cerr << "network loaded via " << net->devicePath() << "\n";
     }
@@ -291,7 +353,7 @@ int main()
     // Per-frame CSV log (one file per run in logs/)
     try
     {
-        logger = std::make_unique<imx500::FrameLogger>();
+        logger = std::make_unique<imx500::FrameLogger>(model->name);
         std::cerr << "log: " << logger->path() << "\n";
     }
     catch (const std::exception &e)
