@@ -6,6 +6,7 @@
 #include "detection_imx500.hpp"
 #include "frame_timer.hpp"
 #include "imx500_network.hpp"
+#include "frame_logger.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -23,13 +24,22 @@ using namespace libcamera;
 namespace
 {
     ///
-    constexpr bool ENABLE_TIMER = true; ///< Flag to enable frame timing logs for performance monitoring.
+    constexpr bool ENABLE_TIMER = false; ///< Flag to enable frame timing logs for performance monitoring.
     /// Flag indicating whether image acquisition should continue.
     std::atomic<bool> running{true};
     /// Becomes true at the first frame carrying the CNN output: the network is running on the sensor.
     std::atomic<bool> networkReady{false};
     /// Shared smart pointer to the Camera object representing the physical IMX500 sensor.
     std::shared_ptr<Camera> camera;
+
+
+    /// CSV log of the run; created in main, written by the request callback.
+    std::unique_ptr<imx500::FrameLogger> logger;
+    /// Progressive number of the completed frames.
+    std::uint64_t frameCount = 0;
+    /// Also print the detections on screen (the CSV log has them anyway).
+    constexpr bool PRINT_DETECTIONS = true;
+
 } // namespace
 
 namespace imx500
@@ -191,32 +201,58 @@ namespace imx500
             return;
         }
 
+        const ControlList &metadata = request->metadata();
+
+        // Capture time of this frame (CLOCK_BOOTTIME, ns) and whether it carries a network result
+        const std::int64_t tSensor = metadata.get(controls::SensorTimestamp).value_or(0);
+        const bool hasTensor = metadata.get(controls::rpi::CnnOutputTensor).has_value();
+        // Run times measured by the sensor itself (µs): network, and DSP pre/post-processing
+        std::int32_t dnnUs = -1, dspUs = -1;
+        if (auto kpi = metadata.get(controls::rpi::CnnKpiInfo))
+        {
+            dnnUs = (*kpi)[0];
+            dspUs = (*kpi)[1];
+        }
         // The first output tensor means the network upload to the sensor is complete
-        if (!networkReady && request->metadata().get(controls::rpi::CnnOutputTensor))
+        if (!networkReady && hasTensor)
         {
             networkReady = true;
         }
 
-        // Optional frame timing logs for performance monitoring
+
+        // Optional timing of the parsing, for performance monitoring
         if constexpr (ENABLE_TIMER)
         {
-            startFrameTimer(); // or logFrameTime(30) to print every 30 frames
+            startFrameTimer();
         }
 
-        const auto detections = parseDetections(request->metadata());
+        const std::int64_t tParseStart = nowBoottimeNs();
+        const auto detections = parseDetections(metadata);
+        // End of processing, on the same clock as tSensor: tProc - tSensor is the latency
+        const std::int64_t tProc = nowBoottimeNs();
 
         if constexpr (ENABLE_TIMER)
         {
             endFrameTimer(8);
         }
-        // Process metadata and print detections
-        for (const auto &det : detections)
+
+
+        if (logger)
         {
-            std::printf("classe %2d  score %.2f  "
-                        "box x=%.0f y=%.0f w=%.0f h=%.0f  "
-                        "centro=(%.0f,%.0f)  errore=(%+.0f,%+.0f) px\n",
-                        det.cls, det.score, det.x, det.y, det.w, det.h,
-                        det.cx, det.cy, det.errX, det.errY);
+            logger->logFrame(frameCount++, tSensor, tProc, tProc - tParseStart, hasTensor, dnnUs, dspUs, detections);
+        }
+
+        // Optional: also print the detections on screen (the CSV log has them anyway)
+        if constexpr (PRINT_DETECTIONS)
+        {
+            for (const auto &det : detections)
+            {
+                std::printf("classe %2d  score %.2f  "
+                            "box x=%.0f y=%.0f w=%.0f h=%.0f  "
+                            "centro=(%.0f,%.0f)  errore=(%+.0f,%+.0f) px\n",
+                            det.cls, det.score, det.x, det.y, det.w, det.h,
+                            det.cx, det.cy, det.errX, det.errY);
+            }
         }
 
         if (running)
@@ -250,6 +286,20 @@ int main()
         std::cerr << e.what() << "\n";
         return 1;
     }
+
+
+    // Per-frame CSV log (one file per run in logs/)
+    try
+    {
+        logger = std::make_unique<imx500::FrameLogger>();
+        std::cerr << "log: " << logger->path() << "\n";
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << "\n";
+        return 1;
+    }
+
 
     // Central libcamera manager. Also starts an internal background thread to handle hardware events.
     CameraManager cm;
@@ -348,6 +398,7 @@ int main()
 
     // Stop camera and release all resources
     camera->stop();
+    logger.reset();
     allocator.free(stream);
     camera->release();
     camera.reset();
