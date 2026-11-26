@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include <libcamera/control_ids.h>
@@ -63,6 +64,12 @@ namespace
 
     std::unique_ptr<tracking::ServoAxis> pan;
     std::unique_ptr<tracking::ServoAxis> tilt;
+
+    /// Target of the last network result that had one; empty = not locked.
+    /// Used only by the libcamera callback thread.
+    std::optional<imx500::Detection> lastTarget;
+    /// Network results in a row without the target, while locked.
+    int missedResults = 0;
     ///@}
 
 } // namespace
@@ -300,8 +307,18 @@ namespace imx500
         // No target -> no command: the servos hold their last position.
         if (pan && hasTensor)
         {
-            if (const auto target = tracking::selectTarget(detections))
+            const auto target = tracking::selectTarget(detections, lastTarget);
+            if (!target && lastTarget && ++missedResults >= tracking::LOST_RESULTS)
             {
+                // Target lost for too long: release the lock, the next result picks the best score again
+                lastTarget.reset();
+                missedResults = 0;
+            }
+            if (target)
+            {
+                lastTarget = target;
+                missedResults = 0;
+
                 try
                 {
                     pan->moveBy(tracking::pCorrection(target->errX, PAN_CTRL));

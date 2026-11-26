@@ -12,7 +12,7 @@
 
 namespace tracking
 {
-    /// Calibration and safety parameters of one axis (values from claude/calibrazione-servo.md).
+    /// Calibration and safety parameters of one axis.
     struct ServoConfig
     {
         int chip;      ///< N in /sys/class/pwm/pwmchipN.
