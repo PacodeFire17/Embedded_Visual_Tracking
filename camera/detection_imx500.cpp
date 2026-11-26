@@ -51,7 +51,7 @@ namespace
 
     /// Calibration of 26/11/2026: chip, channel, min, max, centre, invert, max step.
     constexpr tracking::ServoConfig PAN_CFG{0, 0, 600, 2440, 1590, false, 50};
-    constexpr tracking::ServoConfig TILT_CFG{0, 1, 880, 2390, 1880, false, 50};
+    constexpr tracking::ServoConfig TILT_CFG{0, 1, 880, 2390, 1880, true, 50};
 
     /// About 1 µs of servo per pixel moves the target back to the centre: kp = 0.2 corrects 20 % per result.
     constexpr tracking::PConfig PAN_CTRL{0.3f, 10.0f};

@@ -13,8 +13,8 @@
 
 namespace tracking
 {
-    /// COCO-80 class of the target: 77 = teddy bear (verified with YOLO11n on 17/11/2026).
-    constexpr int TARGET_CLASS = 77;
+    /// COCO-80 class of the target.
+    constexpr int TARGET_CLASS = 0;
 
     /// Returns the detection of class cls with the highest score, if any.
     inline std::optional<imx500::Detection> selectTarget(const std::vector<imx500::Detection> &dets,
