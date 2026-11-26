@@ -18,7 +18,9 @@ add_executable(rilevamento_imx500
     camera/detection_imx500.cpp
     camera/imx500_network.cpp
     camera/frame_logger.cpp
+    servo/servo.cpp
 )
 
 target_link_libraries(rilevamento_imx500 PRIVATE PkgConfig::LIBCAMERA)
+target_include_directories(rilevamento_imx500 PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_options(rilevamento_imx500 PRIVATE -Wall -Wextra)
