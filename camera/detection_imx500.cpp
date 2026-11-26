@@ -7,6 +7,8 @@
 #include "frame_timer.hpp"
 #include "imx500_network.hpp"
 #include "frame_logger.hpp"
+#include "servo/servo.hpp"
+#include "tracking.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -39,6 +41,25 @@ namespace
     std::uint64_t frameCount = 0;
     /// Also print the detections on screen (the CSV log has them anyway).
     constexpr bool PRINT_DETECTIONS = true;
+
+    /** @name Closed loop */
+    ///@{
+    /// Move the servos. false = detection only, as before.
+    constexpr bool ENABLE_SERVOS = true;
+    /// Start with pan only; enable tilt once pan is tuned.
+    constexpr bool ENABLE_TILT = false;
+
+    /// Calibration of 26/11/2026: chip, channel, min, max, centre, invert, max step.
+    constexpr tracking::ServoConfig PAN_CFG{0, 0, 600, 2440, 1590, true, 30};
+    constexpr tracking::ServoConfig TILT_CFG{0, 1, 880, 2390, 1880, false, 30};
+
+    /// About 1 µs of servo per pixel moves the target back to the centre: kp = 0.2 corrects 20 % per result.
+    constexpr tracking::PConfig PAN_CTRL{0.2f, 10.0f};
+    constexpr tracking::PConfig TILT_CTRL{0.2f, 10.0f};
+
+    std::unique_ptr<tracking::ServoAxis> pan;
+    std::unique_ptr<tracking::ServoAxis> tilt;
+    ///@}
 
 } // namespace
 
@@ -236,6 +257,35 @@ namespace imx500
             endFrameTimer(8);
         }
 
+        // Closed loop: act only on frames that carry a network result.
+        // No target -> no command: the servos hold their last position.
+        if (pan && hasTensor)
+        {
+            if (const auto target = tracking::selectTarget(detections))
+            {
+                try
+                {
+                    pan->moveBy(tracking::pCorrection(target->errX, PAN_CTRL));
+                    if (tilt)
+                    {
+                        tilt->moveBy(tracking::pCorrection(target->errY, TILT_CTRL));
+                    }
+                }
+                catch (const std::exception &e)
+                {
+                    // Never let an exception escape a libcamera callback: stop the run instead
+                    std::fprintf(stderr, "servo error: %s\n", e.what());
+                    running = false;
+                }
+                if constexpr (PRINT_DETECTIONS)
+                {
+                    std::printf("TARGET err=(%+.0f,%+.0f) px  pan=%d us  tilt=%d us\n",
+                                target->errX, target->errY, pan->positionUs(),
+                                tilt ? tilt->positionUs() : -1);
+                }
+            }
+        }
+
 
         if (logger)
         {
@@ -287,6 +337,25 @@ int main()
         return 1;
     }
 
+
+    // Servos: move to the calibrated centre and enable the PWM
+    if constexpr (ENABLE_SERVOS)
+    {
+        try
+        {
+            pan = std::make_unique<tracking::ServoAxis>(PAN_CFG);
+            if constexpr (ENABLE_TILT)
+            {
+                tilt = std::make_unique<tracking::ServoAxis>(TILT_CFG);
+            }
+            std::cerr << "servos at centre (pan" << (tilt ? " + tilt" : " only") << ")\n";
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "servo init failed: " << e.what() << "\n";
+            return 1;
+        }
+    }
 
     // Per-frame CSV log (one file per run in logs/)
     try
@@ -398,6 +467,9 @@ int main()
 
     // Stop camera and release all resources
     camera->stop();
+    // No more callbacks after stop(): now the PWM can be disabled safely
+    tilt.reset();
+    pan.reset();
     logger.reset();
     allocator.free(stream);
     camera->release();
