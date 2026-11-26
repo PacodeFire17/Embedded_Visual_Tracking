@@ -4,6 +4,8 @@
 #include <libcamera/libcamera.h>
 #include <vector>
 
+#include "model_spec.hpp"
+
 /**
  * @file detection_imx500.hpp
  * @brief Configuration constants and data structures for the IMX500 AI camera and object detection.
@@ -27,18 +29,12 @@ namespace imx500
     constexpr int H = 480;
     ///@}
 
-    /** @name Neural Network Input Parameters */
-    ///@{
-    /// Input dimension for YOLO11n (1:1 aspect ratio).
-    constexpr float Input_W = 640.0f;
-    ///@}
-
     /** @name Detection Parameters */
     ///@{
     /// Minimum confidence score for a detection to be kept.
     constexpr float SCORE_THRESHOLD = 0.5f;
-    /// Path of the network file (.rpk) loaded on the sensor.
-    constexpr const char *MODEL_PATH = "/home/raspberry/imx500-models/imx500_network_yolo11n_pp.rpk";
+    /// Directory of the network files (.rpk); the file name comes from the chosen ModelSpec.
+    constexpr const char *MODEL_DIR = "/home/raspberry/imx500-models/";
     ///@}
 
     /** @name IMX500 Sensor Specifications */
@@ -101,8 +97,9 @@ namespace imx500
     /**
      * @brief Parses CNN output metadata from libcamera and extracts detections.
      * @param metadata ControlList containing camera frame metadata.
+     * @param model    The model specification to use for parsing.
      * @return Vector of parsed Detection objects.
      */
-    std::vector<Detection> parseDetections(const libcamera::ControlList &metadata);
+    std::vector<Detection> parseDetections(const libcamera::ControlList &metadata, const ModelSpec &model);
 
 } // namespace imx500

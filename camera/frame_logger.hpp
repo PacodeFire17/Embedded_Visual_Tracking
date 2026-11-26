@@ -28,8 +28,9 @@ namespace imx500
     class FrameLogger
     {
     public:
-        /// Creates <directory>/<YYYYMMDD_HHMMSS>.csv and writes the header. Throws std::runtime_error on failure.
-        explicit FrameLogger(const std::string &directory = "logs");
+        /// Creates <directory>/<YYYYMMDD_HHMMSS>_<tag>.csv and writes the header. Throws std::runtime_error on failure.
+        /// @param tag Added to the file name (the model name), to tell the runs apart.
+        explicit FrameLogger(const std::string &tag, const std::string &directory = "logs");
         ~FrameLogger();
         FrameLogger(const FrameLogger &) = delete;
         FrameLogger &operator=(const FrameLogger &) = delete;
@@ -44,7 +45,7 @@ namespace imx500
          * @param dspUs      DSP run time on the sensor (CnnKpiInfo[1], µs), -1 if not available.
          * @param detections Detections of the frame (may be empty).
          */
-                void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs, std::int64_t parseNs,
+        void logFrame(std::uint64_t frame, std::int64_t tSensorNs, std::int64_t tProcNs, std::int64_t parseNs,
                       bool hasTensor, std::int32_t dnnUs, std::int32_t dspUs,
                       const std::vector<Detection> &detections);
 

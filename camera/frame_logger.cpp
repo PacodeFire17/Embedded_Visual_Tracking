@@ -16,14 +16,14 @@ namespace imx500
         return static_cast<std::int64_t>(ts.tv_sec) * 1'000'000'000 + ts.tv_nsec;
     }
 
-    FrameLogger::FrameLogger(const std::string &directory)
+    FrameLogger::FrameLogger(const std::string &tag, const std::string &directory)
     {
-        // One file per run, named after the start date and time
+        // One file per run, named after the start date and time and the tag (model name)
         std::filesystem::create_directories(directory);
         char name[32];
         const std::time_t now = std::time(nullptr);
-        std::strftime(name, sizeof(name), "%Y%m%d_%H%M%S.csv", std::localtime(&now));
-        path_ = directory + "/" + name;
+        std::strftime(name, sizeof(name), "%Y%m%d_%H%M%S", std::localtime(&now));
+        path_ = directory + "/" + name + "_" + tag + ".csv";
 
         file_ = std::fopen(path_.c_str(), "w");
         if (!file_)
